@@ -1,19 +1,26 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
 import firebase_admin
-from firebase_admin import credentials, firestore, auth
+from firebase_admin import credentials, firestore
+import os
+import json
 
 # Inicializar Firebase
-cred = credentials.Certificate('serviceAccountKey.json')
+firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
+if firebase_credentials:
+    cred_dict = json.loads(firebase_credentials)
+    cred = credentials.Certificate(cred_dict)
+else:
+    cred = credentials.Certificate('serviceAccountKey.json')
+
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 app = FastAPI(title="Monitor Hipertensión API")
 
-# CORS para permitir peticiones desde Flutter
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,8 +42,8 @@ class LecturaModel(BaseModel):
     ecg:        int
 
 class CerrarSesionModel(BaseModel):
-    sesionId:       str
-    duracionHoras:  float
+    sesionId:        str
+    duracionHoras:   float
     falsosPositivos: int
     falsosNegativos: int
 
@@ -46,7 +53,6 @@ class CerrarSesionModel(BaseModel):
 async def root():
     return {"status": "API Monitor Hipertensión funcionando"}
 
-# Crear sesión
 @app.post("/sesiones")
 async def crear_sesion(sesion: SesionModel):
     try:
@@ -66,7 +72,6 @@ async def crear_sesion(sesion: SesionModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Guardar lectura del sensor
 @app.post("/lecturas")
 async def guardar_lectura(lectura: LecturaModel):
     try:
@@ -85,7 +90,6 @@ async def guardar_lectura(lectura: LecturaModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Cerrar sesión y calcular indicadores
 @app.post("/sesiones/cerrar")
 async def cerrar_sesion(datos: CerrarSesionModel):
     try:
@@ -141,7 +145,6 @@ async def cerrar_sesion(datos: CerrarSesionModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Obtener todas las sesiones
 @app.get("/sesiones")
 async def obtener_sesiones():
     try:
@@ -150,7 +153,6 @@ async def obtener_sesiones():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Obtener sesión específica
 @app.get("/sesiones/{sesionId}")
 async def obtener_sesion(sesionId: str):
     try:
@@ -166,7 +168,6 @@ async def obtener_sesion(sesionId: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Obtener lecturas de una sesión
 @app.get("/sesiones/{sesionId}/lecturas")
 async def obtener_lecturas(sesionId: str):
     try:
